@@ -1,0 +1,91 @@
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+import mysql.connector
+import time
+
+# MySQL Connection Setup
+db_connection = mysql.connector.connect(
+    host="localhost",
+    user="akash", 
+    password="231306",
+    database="SocialMediaProfiles"
+)
+cursor = db_connection.cursor()
+
+# Create table if not exists
+cursor.execute('''CREATE TABLE IF NOT EXISTS twitter_profiles (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    twitter_handle VARCHAR(255),
+                    bio TEXT,
+                    following_count INT,
+                    followers_count INT,
+                    location VARCHAR(255),
+                    website VARCHAR(255)
+                )''')
+
+# Function to scrape Twitter profile data
+def scrape_twitter_profile(url):
+    # Initialize Selenium WebDriver (Chrome)
+    driver = webdriver.Chrome()  # Ensure chromedriver is in PATH
+
+    try:
+        driver.get(url)
+        time.sleep(3)  # wait for the page to load
+        
+        # Extracting data
+        bio = driver.find_element(By.XPATH, "//div[@data-testid='UserDescription']").text if driver.find_elements(By.XPATH, "//div[@data-testid='UserDescription']") else "No bio"
+        following_count = driver.find_element(By.XPATH, "//a[@href='/{handle}/following']/span").text if driver.find_elements(By.XPATH, "//a[@href='/{handle}/following']/span") else "N/A"
+        followers_count = driver.find_element(By.XPATH, "//a[@href='/{handle}/followers']/span").text if driver.find_elements(By.XPATH, "//a[@href='/{handle}/followers']/span") else "N/A"
+        location = driver.find_element(By.XPATH, "//span[@class='css-901oao css-16my406']").text if driver.find_elements(By.XPATH, "//span[@class='css-901oao css-16my406']") else "No location"
+        website = driver.find_element(By.XPATH, "//a[contains(@href, 'http')]").get_attribute("href") if driver.find_elements(By.XPATH, "//a[contains(@href, 'http')]") else "No website"
+
+        # Return data in dictionary form
+        return {
+            "bio": bio,
+            "following_count": following_count,
+            "followers_count": followers_count,
+            "location": location,
+            "website": website
+        }
+    except Exception as e:
+        print(f"Error scraping {url}: {e}")
+    finally:
+        driver.quit()  # Close the browser after scraping
+
+# List of Twitter URLs
+twitter_urls = [
+    "https://twitter.com/GTNUK1",
+    "https://twitter.com/whatsapp",
+    "https://twitter.com/aacb_CBPTrade",
+    "https://twitter.com/aacbdotcom",
+    "https://twitter.com/@AAWindowPRODUCT",
+    "https://www.twitter.com/aandb_kia",
+    "https://twitter.com/ABHomelnc",
+    "https://twitter.com/Abrepro",
+    "http://www.twitter.com",
+    "https://twitter.com/ACChristofiLtd",
+    "https://twitter.com/aeclothing1",
+    "http://www.twitter.com/",
+    "https://twitter.com/AETechnologies1",
+    "http://www.twitter.com/wix",
+    "https://twitter.com/AGInsuranceLLC"
+]
+
+# Loop through the Twitter URLs and scrape the data
+for url in twitter_urls:
+    data = scrape_twitter_profile(url)
+    
+    if data:  # If data was successfully scraped
+        # Insert data into MySQL table
+        cursor.execute("""
+            INSERT INTO twitter_profiles (twitter_handle, bio, following_count, followers_count, location, website)
+            VALUES (%s, %s, %s, %s, %s, %s)
+        """, (url, data['bio'], data['following_count'], data['followers_count'], data['location'], data['website']))
+        
+        # Commit the transaction
+        db_connection.commit()
+        print(f"Data inserted for {url}")
+
+# Close the database connection after scraping
+cursor.close()
+db_connection.close()
